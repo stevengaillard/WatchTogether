@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Together</title>
+<title>Tipen & Yilin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -342,7 +342,7 @@
       }
       console.error("Peer error:", err);
       if (msg.includes("peer-unavailable")) {
-        setBanner("waiting", "Waiting for your partner to join...");
+        setBanner("waiting", "Waiting for baobeimu to join...");
         // Auto-retry connection every 3 seconds if the host's phone went to sleep
         if (isGuest) {
           setTimeout(() => connectToPeer(FIXED_ROOM), 3000);
@@ -525,9 +525,9 @@
     const n = state.connections.size;
     $("peerCount").textContent = String(n);
     if (n > 0) {
-      setBanner("connected", "Connected with your partner.");
+      setBanner("connected", "Connected with baobeimu.");
     } else if (state.inRoom) {
-      setBanner("waiting", "Waiting for your partner to open the page...");
+      setBanner("waiting", "Waiting for baobeimu to open the page...");
     }
   }
 
@@ -883,7 +883,7 @@
   }
 
   function applyRemoteSync(data) {
-    if (data.action === "pause") showToast("Your partner paused the video.", 3000);
+    if (data.action === "pause") showToast("Baobeimu paused the video.", 3000);
     if (state.ytPlayer) {
       state.suppressSync = true;
       state.ytPlayer.seekTo(data.time, true);
