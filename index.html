@@ -254,7 +254,7 @@
     return s;
   }
 
-  const FIXED_ROOM = "OUR-PRIVATE-ROOM";
+  const FIXED_ROOM = "SG-TW-SYNC-8899";
 
   function startPeer(isGuest) {
     const code = isGuest ? randomCode(8) : FIXED_ROOM;
@@ -307,6 +307,10 @@
       console.error("Peer error:", err);
       if (msg.includes("peer-unavailable")) {
         setBanner("waiting", "Waiting for your partner to join...");
+        // Auto-retry connection every 3 seconds if the host's phone went to sleep
+        if (isGuest) {
+          setTimeout(() => connectToPeer(FIXED_ROOM), 3000);
+        }
       }
     });
   }
