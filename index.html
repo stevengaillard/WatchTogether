@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tipen & Yilin</title>
+<title>Together</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -79,7 +79,12 @@
     border:1px solid var(--amber-dim); border-radius:var(--radius-sm); padding:10px 12px; margin-top:14px; line-height:1.5;
   }
   .stack{ display:flex; flex-direction:column; gap:14px; }
-
+  /* ---------- Password gate ---------- */
+  #passwordGate{
+    position:fixed; inset:0; z-index:999; background:var(--bg);
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  #gateError{ color:var(--danger); font-size:13px; margin-top:10px; min-height:16px; }
   /* ---------- Room ---------- */
   #room{ height:100%; display:none; flex-direction:column; }
   .toolbar{
@@ -177,8 +182,20 @@
 </style>
 </head>
 <body>
-
-<div id="lobby">
+<div id="passwordGate">
+  <div class="card">
+    <h1>Enter password</h1>
+    <p class="sub">This session is protected. Enter the password to continue.</p>
+    <div class="stack">
+      <div class="row">
+        <input id="gatePasswordInput" type="password" placeholder="Password" autocomplete="off">
+        <button id="gateSubmitBtn" class="primary" type="button">Enter</button>
+      </div>
+      <div id="gateError"></div>
+    </div>
+  </div>
+</div>
+<div id="lobby" hidden>
   <div class="card">
     <h1>Together</h1>
     <p class="sub">Share a page or a video with someone and see each other while you watch.</p>
@@ -280,7 +297,25 @@
 
   const secureOk = window.isSecureContext && !!navigator.mediaDevices;
   if (!secureOk) $("secureNotice").hidden = false;
-
+  // ---------- Password gate ----------
+  const GATE_PASSWORD = "091125";
+  function unlockGate() {
+    $("passwordGate").remove();
+    $("lobby").hidden = false;
+    startPeer(false);
+  }
+  function tryGateSubmit() {
+    const val = $("gatePasswordInput").value.trim();
+    if (val === GATE_PASSWORD) {
+      unlockGate();
+    } else {
+      $("gateError").textContent = "Incorrect password.";
+      $("gatePasswordInput").value = "";
+      $("gatePasswordInput").focus();
+    }
+  }
+  $("gateSubmitBtn").addEventListener("click", tryGateSubmit);
+  $("gatePasswordInput").addEventListener("keydown", (e) => { if (e.key === "Enter") tryGateSubmit(); });
   // ---------- Peer setup (short, easy-to-share room codes) ----------
   const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I/L — fewer typing mistakes
   function randomCode(len) {
@@ -342,7 +377,7 @@
       }
       console.error("Peer error:", err);
       if (msg.includes("peer-unavailable")) {
-        setBanner("waiting", "Waiting for baobeimu to join...");
+        setBanner("waiting", "Waiting for your partner to join...");
         // Auto-retry connection every 3 seconds if the host's phone went to sleep
         if (isGuest) {
           setTimeout(() => connectToPeer(FIXED_ROOM), 3000);
@@ -350,7 +385,6 @@
       }
     });
   }
-  startPeer(false);
 
   function inviteLink() {
     const url = new URL(location.href);
@@ -525,9 +559,9 @@
     const n = state.connections.size;
     $("peerCount").textContent = String(n);
     if (n > 0) {
-      setBanner("connected", "Connected with baobeimu.");
+      setBanner("connected", "Connected with your partner.");
     } else if (state.inRoom) {
-      setBanner("waiting", "Waiting for baobeimu to open the page...");
+      setBanner("waiting", "Waiting for your partner to open the page...");
     }
   }
 
@@ -883,7 +917,7 @@
   }
 
   function applyRemoteSync(data) {
-    if (data.action === "pause") showToast("Baobeimu paused the video.", 3000);
+    if (data.action === "pause") showToast("Your partner paused the video.", 3000);
     if (state.ytPlayer) {
       state.suppressSync = true;
       state.ytPlayer.seekTo(data.time, true);
