@@ -143,6 +143,13 @@
     opacity:0; transition:opacity .3s ease;
   }
   #stageToast.show{ opacity:1; }
+  #chatToggleBtn{ position:relative; }
+  .chat-badge{
+    position:absolute; top:-4px; right:-4px; width:10px; height:10px;
+    border-radius:50%; background:var(--danger); border:2px solid var(--panel-2);
+    display:none;
+  }
+  .chat-badge.show{ display:block; }
   #chatDrawer{
     position:fixed; top:56px; bottom:0; right:0; width:300px; max-width:88vw;
     background:var(--panel); border-left:1px solid var(--line);
@@ -214,7 +221,7 @@
     <button id="camToggleBtn" type="button">Camera on</button>
     <button id="micToggleBtn" type="button">Mic on</button>
     <button id="fullscreenBtn" type="button">Fullscreen</button>
-    <button id="chatToggleBtn" type="button">Chat</button>
+        <button id="chatToggleBtn" type="button">Chat<span id="chatBadge" class="chat-badge"></span></button>
     <div class="room-meta">Your code <span class="code" id="roomCodeLabel"></span>, <span id="peerCount">0</span> connected</div>
   </div>
 
@@ -494,6 +501,7 @@
         break;
       case "chat":
         appendChatMessage(fromId, data.text, false);
+        notifyNewMessage();
         break;
       case "load-url":
         loadContent(data.mode, data.url, true);
@@ -646,8 +654,26 @@
       if (exit) exit.call(document);
     }
   });
-  document.addEventListener("fullscreenchange", updateFullscreenBtn);
-  document.addEventListener("webkitfullscreenchange", updateFullscreenBtn);
+  document.addEventListener("fullscreenchange", handleFullscreenChange);
+  document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+  function handleFullscreenChange() {
+    const wrap = $("stageWrap");
+    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+    // Best-effort only: if the site's own player (or a bare <video>) went
+    // fullscreen by itself, try swapping it for our wrapper so bubbles ride
+    // along. Browsers may silently block this swap for cross-origin content —
+    // if that happens nothing breaks, it just stays as their normal fullscreen.
+    if (fsEl && fsEl !== wrap && wrap.contains(fsEl)) {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen;
+      if (exit) {
+        exit.call(document).then(() => {
+          const req = wrap.requestFullscreen || wrap.webkitRequestFullscreen;
+          if (req) req.call(wrap).catch(() => {});
+        }).catch(() => {});
+      }
+    }
+    updateFullscreenBtn();
+  }
   function updateFullscreenBtn() {
     $("fullscreenBtn").textContent = isFullscreen() ? "Exit fullscreen" : "Fullscreen";
     $("fullscreenBtn").classList.toggle("active", isFullscreen());
@@ -661,7 +687,10 @@
     showToast._t = setTimeout(() => el.classList.remove("show"), ms || 7000);
   }
   // ---------- Chat ----------
-  $("chatToggleBtn").addEventListener("click", () => $("chatDrawer").classList.toggle("open"));
+  $("chatToggleBtn").addEventListener("click", () => {
+    $("chatDrawer").classList.toggle("open");
+    if ($("chatDrawer").classList.contains("open")) $("chatBadge").classList.remove("show");
+  });
   $("chatForm").addEventListener("submit", (e) => {
     e.preventDefault();
     const text = $("chatInput").value.trim();
@@ -679,7 +708,45 @@
     $("chatLog").appendChild(div);
     $("chatLog").scrollTop = $("chatLog").scrollHeight;
   }
+  function notifyNewMessage() {
+    if (!$("chatDrawer").classList.contains("open")) {
+      $("chatBadge").classList.add("show");
+    }
+    playTing();
+  }
 
+  let audioCtx = null;
+  function unlockAudio() {
+    if (!audioCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) audioCtx = new AC();
+    } else if (audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
+  }
+  // Browsers block sound until the user interacts with the page once —
+  // this quietly primes it on the very first click/tap anywhere.
+  document.addEventListener("pointerdown", unlockAudio, { once: true });
+
+  function playTing() {
+    unlockAudio();
+    if (!audioCtx) return;
+    const now = audioCtx.currentTime;
+    [1046.5, 1568].forEach((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const start = now + i * 0.07;
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(0.18, start + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.35);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(start);
+      osc.stop(start + 0.4);
+    });
+  }
   function escapeHtml(s) {
     return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
