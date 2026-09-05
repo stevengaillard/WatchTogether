@@ -233,6 +233,8 @@
     suppressSync: false,
     camOn: true,
     micOn: true,
+    camTouched: false,
+    micTouched: false,
     ytPlayer: null,
     inRoom: false,
   };
@@ -423,10 +425,11 @@
 
   function tryCallPeer(id) {
     if (!state.localStream) return;
-    // Don't skip just because a call already exists — it may have been
-    // answered before we had a local stream (e.g. camera turned on after
-    // the connection opened), in which case it never carried our video.
-    // Placing a fresh call fixes that; the old one-way call is simply left unused.
+    const entry = state.connections.get(id);
+    // Only skip if we've already gotten our own video/audio to this peer once.
+    // If a call exists but never carried our stream (e.g. answered before we
+    // turned our camera on), place a fresh one so our media actually goes out.
+    if (entry && entry.sentStream) return;
     const call = state.peer.call(id, state.localStream);
     setupCall(call, id);
   }
@@ -437,7 +440,8 @@
 
   function setupCall(call, id) {
     const existing = state.connections.get(id) || {};
-    state.connections.set(id, { ...existing, call });
+    const sentStream = !!state.localStream;
+    state.connections.set(id, { ...existing, call, sentStream: existing.sentStream || sentStream });
     call.on("stream", (remoteStream) => addOrUpdateBubble(id, remoteStream, false));
     call.on("close", () => cleanupPeer(id));
   }
@@ -524,19 +528,19 @@
 
   // ---------- Camera / mic toggles (room toolbar) ----------
   $("camToggleBtn").addEventListener("click", async () => {
-    const hadStream = !!state.localStream;
     if (!state.localStream) { await ensureMedia(); }
     if (!state.localStream) return;
-    if (hadStream) state.camOn = !state.camOn;
+    if (state.camTouched) state.camOn = !state.camOn;
+    state.camTouched = true;
     state.localStream.getVideoTracks().forEach((t) => (t.enabled = state.camOn));
     $("camToggleBtn").textContent = state.camOn ? "Camera on" : "Camera off";
     $("camToggleBtn").classList.toggle("active", state.camOn);
   });
   $("micToggleBtn").addEventListener("click", async () => {
-    const hadStream = !!state.localStream;
     if (!state.localStream) { await ensureMedia(); }
     if (!state.localStream) return;
-    if (hadStream) state.micOn = !state.micOn;
+    if (state.micTouched) state.micOn = !state.micOn;
+    state.micTouched = true;
     state.localStream.getAudioTracks().forEach((t) => (t.enabled = state.micOn));
     $("micToggleBtn").textContent = state.micOn ? "Mic on" : "Mic off";
     $("micToggleBtn").classList.toggle("active", state.micOn);
