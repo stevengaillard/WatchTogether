@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Together</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  :root{
+    --bg:#12151b;
+    --panel:#1a1f28;
+    --panel-2:#1f2530;
+    --line:#2a3140;
+    --text:#eae7df;
+    --text-dim:#8f97a6;
+    --amber:#e8a33d;
+    --amber-dim:#5c4823;
+    --teal:#3ec9b0;
+    --danger:#e2574c;
+    --radius-sm:6px;
+    --font:'Manrope',system-ui,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{ transition:none !important; animation:none !important; }
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:var(--font); overflow:hidden;
+  }
+  button, input{ font-family:inherit; }
+  button{
+    cursor:pointer; border:1px solid var(--line); background:var(--panel-2);
+    color:var(--text); border-radius:var(--radius-sm); padding:9px 14px;
+    font-weight:700; font-size:14px; transition:border-color .15s, background .15s;
+  }
+  button:hover{ border-color:var(--amber); }
+  button:disabled{ opacity:.4; cursor:not-allowed; }
+  button:focus-visible, input:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+  button.primary{ background:var(--amber); border-color:var(--amber); color:#1a1305; }
+  button.primary:hover{ filter:brightness(1.08); }
+  button.ghost{ background:transparent; }
+  button.active{ border-color:var(--teal); color:var(--teal); }
+  input[type=text]{
+    background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+    border-radius:var(--radius-sm); padding:9px 12px; font-size:14px;
+  }
+
+  /* ---------- Lobby ---------- */
+  #lobby{
+    height:100%; display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .card{
+    width:100%; max-width:420px; background:var(--panel); border:1px solid var(--line);
+    border-radius:var(--radius-sm); padding:28px;
+  }
+  .card h1{ margin:0 0 6px; font-size:24px; font-weight:800; letter-spacing:-.02em; }
+  .card p.sub{ margin:0 0 24px; color:var(--text-dim); font-size:14px; line-height:1.5; }
+  .field-label{ font-size:13px; color:var(--text-dim); margin-bottom:6px; display:block; }
+  .code-box{
+    font-family:var(--mono); font-size:22px; letter-spacing:.04em; background:var(--panel-2);
+    border:1px solid var(--line); border-radius:var(--radius-sm); padding:12px 14px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+  }
+  .row{ display:flex; gap:8px; }
+  .row > input{ flex:1; }
+  .divider{ display:flex; align-items:center; gap:10px; margin:20px 0; color:var(--text-dim); font-size:13px; }
+  .divider::before, .divider::after{ content:""; flex:1; height:1px; background:var(--line); }
+  .lobby-video{
+    width:100%; aspect-ratio:16/10; background:#000; border-radius:var(--radius-sm);
+    object-fit:cover; margin-top:16px; border:1px solid var(--line);
+  }
+  .notice{
+    font-size:13px; color:var(--amber); background:rgba(232,163,61,.08);
+    border:1px solid var(--amber-dim); border-radius:var(--radius-sm); padding:10px 12px; margin-top:14px; line-height:1.5;
+  }
+  .stack{ display:flex; flex-direction:column; gap:14px; }
+
+  /* ---------- Room ---------- */
+  #room{ height:100%; display:none; flex-direction:column; }
+  .toolbar{
+    height:56px; flex:0 0 auto; background:var(--panel-2); border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:8px; padding:0 12px;
+  }
+  .toolbar .mode-group{ display:flex; gap:4px; background:var(--panel); border-radius:var(--radius-sm); padding:3px; }
+  .toolbar .mode-group button{ border:none; padding:6px 10px; font-size:13px; }
+  .toolbar input[type=text]{ flex:1; min-width:80px; }
+  .toolbar .spacer{ flex:1; }
+  .room-meta{ font-size:12px; color:var(--text-dim); padding:0 10px; white-space:nowrap; }
+  .room-meta span.code{ font-family:var(--mono); color:var(--text); }
+
+  .conn-banner{
+    flex:0 0 auto; padding:8px 14px; font-size:13px; font-weight:700;
+    display:flex; align-items:center; gap:8px;
+  }
+  .conn-banner:empty{ display:none; }
+  .conn-banner .dot{ width:8px; height:8px; border-radius:50%; background:currentColor; flex:0 0 auto; }
+  .conn-banner.waiting{ background:rgba(232,163,61,.12); color:var(--amber); }
+  .conn-banner.connected{ background:rgba(62,201,176,.12); color:var(--teal); }
+  .conn-banner.error{ background:rgba(226,87,76,.12); color:var(--danger); }
+
+  #stage{
+    flex:1; min-height:0; background:#000; position:relative;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #stage iframe, #stage video{ width:100%; height:100%; border:0; }
+  #stage video{ object-fit:contain; background:#000; }
+  #stagePlaceholder{ color:var(--text-dim); font-size:14px; text-align:center; max-width:320px; line-height:1.6; }
+
+  #filmstrip{
+    position:absolute; left:0; right:0; bottom:0; padding:10px 12px;
+    display:flex; gap:10px; overflow-x:auto; pointer-events:none;
+  }
+  .bubble{
+    pointer-events:auto; flex:0 0 auto; width:76px; text-align:center;
+  }
+  .bubble .ring{
+    width:76px; height:76px; border-radius:50%; padding:2px; background:var(--line);
+  }
+  .bubble.you .ring{ background:var(--amber); }
+  .bubble.peer .ring{ background:var(--teal); }
+  .bubble video{
+    width:100%; height:100%; border-radius:50%; object-fit:cover; background:#000; display:block;
+  }
+  .bubble .tag{ font-size:11px; color:var(--text-dim); margin-top:4px; font-family:var(--mono); }
+
+  #chatDrawer{
+    position:fixed; top:56px; bottom:0; right:0; width:300px; max-width:88vw;
+    background:var(--panel); border-left:1px solid var(--line);
+    display:flex; flex-direction:column; transform:translateX(100%); transition:transform .2s ease;
+    z-index:5;
+  }
+  #chatDrawer.open{ transform:translateX(0); }
+  #chatLog{ flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; }
+  .msg{ font-size:13px; line-height:1.4; }
+  .msg .who{ color:var(--teal); font-weight:700; margin-right:6px; }
+  .msg.me .who{ color:var(--amber); }
+  #chatForm{ display:flex; gap:6px; padding:10px; border-top:1px solid var(--line); }
+  #chatForm input{ flex:1; }
+
+  @media (max-width:640px){
+    .toolbar{ flex-wrap:wrap; height:auto; padding:8px; }
+    .room-meta{ order:5; width:100%; padding:4px 4px 0; }
+    #chatDrawer{ top:0; width:100%; max-width:100%; }
+  }
+</style>
+</head>
+<body>
+
+<div id="lobby">
+  <div class="card">
+    <h1>Together</h1>
+    <p class="sub">Share a page or a video with someone and see each other while you watch.</p>
+
+    <div class="stack">
+      <div>
+        <span class="field-label">Your code</span>
+        <div class="code-box">
+          <span id="myCode">connecting…</span>
+          <div style="display:flex; gap:6px;">
+            <button id="copyCodeBtn" class="ghost" type="button">Copy code</button>
+            <button id="copyLinkBtn" class="ghost" type="button">Copy link</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider">or connect using a friend's code</div>
+
+      <div class="row">
+        <input id="joinInput" type="text" placeholder="Enter their code" autocomplete="off">
+        <button id="joinBtn" class="primary" type="button" disabled>Join</button>
+      </div>
+
+      <video id="lobbyPreview" class="lobby-video" autoplay muted playsinline hidden></video>
+      <button id="lobbyCamBtn" class="ghost" type="button">Turn on camera &amp; mic</button>
+      <button id="enterAloneBtn" class="ghost" type="button" disabled>Continue — wait for someone to connect</button>
+
+      <div id="secureNotice" class="notice" hidden>
+        Camera and mic only work when this page is opened over <strong>https://</strong> or <strong>http://localhost</strong>.
+        Opening the file directly (file://) will block camera access — run it through a simple local server instead.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="room">
+  <div class="toolbar">
+    <div class="mode-group">
+      <button id="modeWebsite" class="active" type="button">Website</button>
+      <button id="modeVideo" type="button">Video URL</button>
+    </div>
+    <input id="urlInput" type="text" placeholder="Paste a link and load it for everyone">
+    <button id="loadBtn" type="button">Load for everyone</button>
+    <div class="spacer"></div>
+    <button id="camToggleBtn" type="button">Camera on</button>
+    <button id="micToggleBtn" type="button">Mic on</button>
+    <button id="chatToggleBtn" type="button">Chat</button>
+    <div class="room-meta">Your code <span class="code" id="roomCodeLabel"></span>, <span id="peerCount">0</span> connected</div>
+  </div>
+
+  <div id="connBanner" class="conn-banner"></div>
+
+  <div id="stage">
+    <div id="stagePlaceholder">Load a website or paste a direct video link above to start watching together.</div>
+  </div>
+
+  <div id="filmstrip"></div>
+
+  <div id="chatDrawer">
+    <div id="chatLog"></div>
+    <form id="chatForm">
+      <input id="chatInput" type="text" placeholder="Say something" autocomplete="off">
+      <button class="primary" type="submit">Send</button>
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const state = {
+    peer: null,
+    myId: null,
+    localStream: null,
+    connections: new Map(), // peerId -> { dataConn, call, videoEl }
+    mode: "website",
+    currentUrl: "",
+    suppressSync: false,
+    camOn: true,
+    micOn: true,
+    ytPlayer: null,
+    inRoom: false,
+  };
+  let ytWatchTimer = null;
+  let ytLastTime = 0;
+  let ytApiPromise = null;
+
+  const $ = (id) => document.getElementById(id);
+
+  const secureOk = window.isSecureContext && !!navigator.mediaDevices;
+  if (!secureOk) $("secureNotice").hidden = false;
+
+  // ---------- Peer setup (short, easy-to-share room codes) ----------
+  const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I/L — fewer typing mistakes
+  function randomCode(len) {
+    len = len || 5;
+    let s = "";
+    for (let i = 0; i < len; i++) s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    return s;
+  }
+
+  function startPeer(attempt) {
+    attempt = attempt || 0;
+    const code = randomCode();
+    const p = new Peer(code);
+    p.on("open", (id) => {
+      state.peer = p;
+      state.myId = id;
+      $("myCode").textContent = id;
+      $("roomCodeLabel").textContent = id;
+      $("joinBtn").disabled = false;
+      $("enterAloneBtn").disabled = false;
+      checkPendingJoinFromLink();
+    });
+    p.on("connection", (conn) => {
+      enterRoom();
+      setupDataConnection(conn);
+    });
+    p.on("call", (call) => {
+      enterRoom();
+      call.answer(state.localStream || undefined);
+      setupCall(call, call.peer);
+    });
+    p.on("error", (err) => {
+      const msg = (err && err.type) || String(err);
+      if (msg.includes("unavailable-id") && attempt < 6) {
+        p.destroy();
+        startPeer(attempt + 1);
+        return;
+      }
+      console.error("Peer error:", err);
+      if (msg.includes("peer-unavailable")) {
+        setBanner("error", "Couldn't reach that code. Ask your friend for their current code — it resets every time they reload the page.");
+      }
+    });
+  }
+  startPeer();
+
+  function inviteLink() {
+    const url = new URL(location.href);
+    url.search = "";
+    url.searchParams.set("room", state.myId || "");
+    return url.toString();
+  }
+
+  function checkPendingJoinFromLink() {
+    const room = new URLSearchParams(location.search).get("room");
+    if (room && room.toUpperCase() !== state.myId) {
+      enterRoom();
+      connectToPeer(room.toUpperCase());
+    }
+  }
+
+  // ---------- Media ----------
+  async function ensureMedia() {
+    if (state.localStream) return state.localStream;
+    if (!secureOk) { alert("Camera/mic needs https:// or http://localhost. See the note in the lobby."); return null; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      state.localStream = stream;
+      $("lobbyPreview").srcObject = stream;
+      $("lobbyPreview").hidden = false;
+      addOrUpdateBubble("you", stream, true);
+      tryCallAll();
+      return stream;
+    } catch (e) {
+      console.error(e);
+      alert("Couldn't access your camera/mic. You can still join without them.");
+      return null;
+    }
+  }
+
+  $("lobbyCamBtn").addEventListener("click", ensureMedia);
+
+  // ---------- Lobby actions ----------
+  $("copyCodeBtn").addEventListener("click", () => {
+    navigator.clipboard.writeText(state.myId || "").then(() => {
+      $("copyCodeBtn").textContent = "Copied";
+      setTimeout(() => ($("copyCodeBtn").textContent = "Copy code"), 1200);
+    });
+  });
+
+  $("copyLinkBtn").addEventListener("click", () => {
+    navigator.clipboard.writeText(inviteLink()).then(() => {
+      $("copyLinkBtn").textContent = "Copied";
+      setTimeout(() => ($("copyLinkBtn").textContent = "Copy link"), 1200);
+    });
+  });
+
+  $("enterAloneBtn").addEventListener("click", () => enterRoom());
+
+  $("joinBtn").addEventListener("click", joinRoom);
+  $("joinInput").addEventListener("keydown", (e) => { if (e.key === "Enter") joinRoom(); });
+  $("joinInput").addEventListener("input", () => {
+    const el = $("joinInput");
+    el.value = el.value.toUpperCase();
+  });
+
+  function joinRoom() {
+    const target = $("joinInput").value.trim().toUpperCase();
+    if (!target) return;
+    enterRoom();
+    connectToPeer(target);
+  }
+
+  function enterRoom() {
+    if (state.inRoom) return;
+    state.inRoom = true;
+    $("lobby").style.display = "none";
+    $("room").style.display = "flex";
+    updatePeerCount();
+  }
+
+  // ---------- Data connections / mesh ----------
+  function setupDataConnection(conn) {
+    const existing = state.connections.get(conn.peer) || {};
+    state.connections.set(conn.peer, { ...existing, dataConn: conn });
+
+    conn.on("open", () => {
+      updatePeerCount();
+      // tell the new peer about everyone we already know
+      const others = [...state.connections.keys()].filter((id) => id !== conn.peer);
+      conn.send({ type: "peer-list", peers: others });
+      // tell existing peers to connect to the newcomer
+      broadcast({ type: "new-peer", id: conn.peer }, [conn.peer]);
+      // sync the newcomer to whatever is currently loaded
+      if (state.currentUrl) conn.send({ type: "load-url", mode: state.mode, url: state.currentUrl });
+      tryCallPeer(conn.peer);
+    });
+    conn.on("data", (data) => handleData(conn.peer, data));
+    conn.on("close", () => cleanupPeer(conn.peer));
+    conn.on("error", () => cleanupPeer(conn.peer));
+  }
+
+  function connectToPeer(id) {
+    if (!state.peer || id === state.myId || state.connections.has(id)) return;
+    const conn = state.peer.connect(id, { reliable: true });
+    setupDataConnection(conn);
+  }
+
+  function tryCallPeer(id) {
+    if (!state.localStream) return;
+    const entry = state.connections.get(id);
+    if (entry && entry.call) return;
+    const call = state.peer.call(id, state.localStream);
+    setupCall(call, id);
+  }
+
+  function tryCallAll() {
+    for (const id of state.connections.keys()) tryCallPeer(id);
+  }
+
+  function setupCall(call, id) {
+    const existing = state.connections.get(id) || {};
+    state.connections.set(id, { ...existing, call });
+    call.on("stream", (remoteStream) => addOrUpdateBubble(id, remoteStream, false));
+    call.on("close", () => cleanupPeer(id));
+  }
+
+  function cleanupPeer(id) {
+    const entry = state.connections.get(id);
+    if (entry) {
+      if (entry.call) entry.call.close();
+      if (entry.dataConn) entry.dataConn.close();
+    }
+    state.connections.delete(id);
+    const bubble = document.querySelector('.bubble[data-id="' + cssEscape(id) + '"]');
+    if (bubble) bubble.remove();
+    updatePeerCount();
+  }
+
+  function broadcast(msg, excludeIds) {
+    excludeIds = excludeIds || [];
+    for (const [id, entry] of state.connections) {
+      if (excludeIds.includes(id)) continue;
+      if (entry.dataConn && entry.dataConn.open) entry.dataConn.send(msg);
+    }
+  }
+
+  function handleData(fromId, data) {
+    switch (data.type) {
+      case "peer-list":
+        data.peers.forEach(connectToPeer);
+        break;
+      case "new-peer":
+        connectToPeer(data.id);
+        break;
+      case "chat":
+        appendChatMessage(fromId, data.text, false);
+        break;
+      case "load-url":
+        loadContent(data.mode, data.url, true);
+        break;
+      case "sync":
+        applyRemoteSync(data);
+        break;
+    }
+  }
+
+  function updatePeerCount() {
+    const n = state.connections.size;
+    $("peerCount").textContent = String(n);
+    if (n > 0) {
+      setBanner("connected", "Connected with " + n + (n === 1 ? " person" : " people") + ".");
+    } else if (state.inRoom) {
+      setBanner("waiting", "Not connected yet — share your code above, or enter theirs.");
+    }
+  }
+
+  function setBanner(kind, text) {
+    const el = $("connBanner");
+    el.className = "conn-banner " + kind;
+    el.innerHTML = '<span class="dot"></span>' + escapeHtml(text);
+  }
+
+  function cssEscape(s) {
+    return String(s).replace(/[^a-zA-Z0-9_-]/g, "");
+  }
+
+  // ---------- Video bubbles ----------
+  function addOrUpdateBubble(id, stream, isYou) {
+    const safeId = cssEscape(id);
+    let bubble = document.querySelector('.bubble[data-id="' + safeId + '"]');
+    if (!bubble) {
+      bubble = document.createElement("div");
+      bubble.className = "bubble " + (isYou ? "you" : "peer");
+      bubble.dataset.id = id;
+      bubble.innerHTML =
+        '<div class="ring"><video autoplay playsinline ' + (isYou ? "muted" : "") + '></video></div>' +
+        '<div class="tag">' + (isYou ? "you" : id.slice(0, 5)) + "</div>";
+      $("filmstrip").appendChild(bubble);
+    }
+    bubble.querySelector("video").srcObject = stream;
+  }
+
+  // ---------- Camera / mic toggles (room toolbar) ----------
+  $("camToggleBtn").addEventListener("click", async () => {
+    if (!state.localStream) { await ensureMedia(); }
+    if (!state.localStream) return;
+    state.camOn = !state.camOn;
+    state.localStream.getVideoTracks().forEach((t) => (t.enabled = state.camOn));
+    $("camToggleBtn").textContent = state.camOn ? "Camera on" : "Camera off";
+    $("camToggleBtn").classList.toggle("active", state.camOn);
+  });
+
+  $("micToggleBtn").addEventListener("click", async () => {
+    if (!state.localStream) { await ensureMedia(); }
+    if (!state.localStream) return;
+    state.micOn = !state.micOn;
+    state.localStream.getAudioTracks().forEach((t) => (t.enabled = state.micOn));
+    $("micToggleBtn").textContent = state.micOn ? "Mic on" : "Mic off";
+    $("micToggleBtn").classList.toggle("active", state.micOn);
+  });
+
+  // ---------- Chat ----------
+  $("chatToggleBtn").addEventListener("click", () => $("chatDrawer").classList.toggle("open"));
+  $("chatForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = $("chatInput").value.trim();
+    if (!text) return;
+    appendChatMessage("you", text, true);
+    broadcast({ type: "chat", text });
+    $("chatInput").value = "";
+  });
+
+  function appendChatMessage(who, text, isMe) {
+    const div = document.createElement("div");
+    div.className = "msg" + (isMe ? " me" : "");
+    const label = isMe ? "you" : String(who).slice(0, 5);
+    div.innerHTML = '<span class="who">' + label + "</span>" + escapeHtml(text);
+    $("chatLog").appendChild(div);
+    $("chatLog").scrollTop = $("chatLog").scrollHeight;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // ---------- Mode + content loading ----------
+  $("modeWebsite").addEventListener("click", () => setMode("website"));
+  $("modeVideo").addEventListener("click", () => setMode("video"));
+
+  function setMode(mode) {
+    state.mode = mode;
+    $("modeWebsite").classList.toggle("active", mode === "website");
+    $("modeVideo").classList.toggle("active", mode === "video");
+    $("urlInput").placeholder = mode === "website"
+      ? "Paste a link and load it for everyone"
+      : "Paste a direct video link (.mp4, .m3u8, etc.)";
+  }
+
+  $("loadBtn").addEventListener("click", () => {
+    const url = $("urlInput").value.trim();
+    if (!url) return;
+    loadContent(state.mode, url, false);
+  });
+  $("urlInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("loadBtn").click(); });
+
+  const YT_RE = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{11})/;
+
+  function loadContent(mode, url, fromRemote) {
+    state.mode = mode;
+    state.currentUrl = url;
+    setMode(mode);
+    if (!fromRemote) $("urlInput").value = url;
+
+    if (state.ytPlayer) { state.ytPlayer.destroy(); state.ytPlayer = null; }
+    clearInterval(ytWatchTimer);
+
+    const stage = $("stage");
+    stage.innerHTML = "";
+
+    const ytMatch = mode === "website" ? url.match(YT_RE) : null;
+    if (ytMatch) {
+      loadYouTube(ytMatch[1]);
+    } else if (mode === "website") {
+      const iframe = document.createElement("iframe");
+      iframe.src = url;
+      iframe.setAttribute("allow", "autoplay; encrypted-media; fullscreen");
+      stage.appendChild(iframe);
+      if (!fromRemote) {
+        setTimeout(() => {
+          // Heads up in the console rather than the UI, since we can't reliably
+          // detect a blocked frame from this side.
+          console.info("If the page stays blank, that site's owner has blocked embedding (X-Frame-Options / CSP) — a browser security rule, not something this page controls. Outside of YouTube (official player API) or Video URL mode, play/pause can't be synced across an iframe for the same reason.");
+        }, 800);
+      }
+    } else {
+      const video = document.createElement("video");
+      video.id = "mediaPlayer";
+      video.src = url;
+      video.controls = true;
+      video.playsInline = true;
+      stage.appendChild(video);
+      video.addEventListener("play", () => emitSync("play", video));
+      video.addEventListener("pause", () => emitSync("pause", video));
+      video.addEventListener("seeked", () => emitSync("seek", video));
+    }
+
+    if (!fromRemote) broadcast({ type: "load-url", mode, url });
+  }
+
+  function loadYouTubeAPI() {
+    if (window.YT && window.YT.Player) return Promise.resolve();
+    if (ytApiPromise) return ytApiPromise;
+    ytApiPromise = new Promise((resolve) => {
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => { if (prev) prev(); resolve(); };
+      const tag = document.createElement("script");
+      tag.src = "https://www.youtube.com/iframe_api";
+      document.head.appendChild(tag);
+    });
+    return ytApiPromise;
+  }
+
+  async function loadYouTube(videoId) {
+    const holder = document.createElement("div");
+    holder.id = "ytPlayer";
+    holder.style.width = "100%";
+    holder.style.height = "100%";
+    $("stage").appendChild(holder);
+    await loadYouTubeAPI();
+    state.ytPlayer = new YT.Player("ytPlayer", {
+      videoId: videoId,
+      playerVars: { playsinline: 1, rel: 0 },
+      events: { onStateChange: onYtStateChange },
+    });
+    ytLastTime = 0;
+    clearInterval(ytWatchTimer);
+    ytWatchTimer = setInterval(() => {
+      if (!state.ytPlayer || state.suppressSync || typeof state.ytPlayer.getPlayerState !== "function") return;
+      if (state.ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
+        ytLastTime = state.ytPlayer.getCurrentTime();
+        return;
+      }
+      const now = state.ytPlayer.getCurrentTime();
+      if (Math.abs(now - (ytLastTime + 0.5)) > 1.2) {
+        broadcast({ type: "sync", action: "seek", time: now });
+      }
+      ytLastTime = now;
+    }, 500);
+  }
+
+  function onYtStateChange(e) {
+    if (state.suppressSync || !state.ytPlayer) return;
+    if (e.data === YT.PlayerState.PLAYING) {
+      broadcast({ type: "sync", action: "play", time: state.ytPlayer.getCurrentTime() });
+    } else if (e.data === YT.PlayerState.PAUSED) {
+      broadcast({ type: "sync", action: "pause", time: state.ytPlayer.getCurrentTime() });
+    }
+  }
+
+  function emitSync(action, video) {
+    if (state.suppressSync) return;
+    broadcast({ type: "sync", action, time: video.currentTime, ts: Date.now() });
+  }
+
+  function applyRemoteSync(data) {
+    if (state.ytPlayer) {
+      state.suppressSync = true;
+      state.ytPlayer.seekTo(data.time, true);
+      if (data.action === "play") state.ytPlayer.playVideo();
+      else if (data.action === "pause") state.ytPlayer.pauseVideo();
+      setTimeout(() => (state.suppressSync = false), 600);
+      return;
+    }
+    const video = $("mediaPlayer");
+    if (!video) return;
+    state.suppressSync = true;
+    if (Math.abs(video.currentTime - data.time) > 0.4) video.currentTime = data.time;
+    if (data.action === "play") video.play().catch(() => {});
+    else if (data.action === "pause") video.pause();
+    setTimeout(() => (state.suppressSync = false), 400);
+  }
+})();
+</script>
+</body>
+</html>
