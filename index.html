@@ -163,7 +163,12 @@
   .msg.me .who{ color:var(--amber); }
   #chatForm{ display:flex; gap:6px; padding:10px; border-top:1px solid var(--line); }
   #chatForm input{ flex:1; }
-
+  #chatDrawerHeader{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px; border-bottom:1px solid var(--line); flex:0 0 auto;
+  }
+  #chatDrawerHeader span{ font-weight:700; font-size:14px; }
+  #chatCloseBtn{ padding:4px 10px; font-size:16px; line-height:1; }
   @media (max-width:640px){
     .toolbar{ flex-wrap:wrap; height:auto; padding:8px; }
     .room-meta{ order:5; width:100%; padding:4px 4px 0; }
@@ -236,6 +241,10 @@
   </div>
 
   <div id="chatDrawer">
+    <div id="chatDrawerHeader">
+      <span>Chat</span>
+      <button id="chatCloseBtn" type="button" class="ghost">✕</button>
+    </div>
     <div id="chatLog"></div>
     <form id="chatForm">
       <input id="chatInput" type="text" placeholder="Say something" autocomplete="off">
@@ -654,26 +663,8 @@
       if (exit) exit.call(document);
     }
   });
-  document.addEventListener("fullscreenchange", handleFullscreenChange);
-  document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
-  function handleFullscreenChange() {
-    const wrap = $("stageWrap");
-    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
-    // Best-effort only: if the site's own player (or a bare <video>) went
-    // fullscreen by itself, try swapping it for our wrapper so bubbles ride
-    // along. Browsers may silently block this swap for cross-origin content —
-    // if that happens nothing breaks, it just stays as their normal fullscreen.
-    if (fsEl && fsEl !== wrap && wrap.contains(fsEl)) {
-      const exit = document.exitFullscreen || document.webkitExitFullscreen;
-      if (exit) {
-        exit.call(document).then(() => {
-          const req = wrap.requestFullscreen || wrap.webkitRequestFullscreen;
-          if (req) req.call(wrap).catch(() => {});
-        }).catch(() => {});
-      }
-    }
-    updateFullscreenBtn();
-  }
+  document.addEventListener("fullscreenchange", updateFullscreenBtn);
+  document.addEventListener("webkitfullscreenchange", updateFullscreenBtn);
   function updateFullscreenBtn() {
     $("fullscreenBtn").textContent = isFullscreen() ? "Exit fullscreen" : "Fullscreen";
     $("fullscreenBtn").classList.toggle("active", isFullscreen());
@@ -690,6 +681,9 @@
   $("chatToggleBtn").addEventListener("click", () => {
     $("chatDrawer").classList.toggle("open");
     if ($("chatDrawer").classList.contains("open")) $("chatBadge").classList.remove("show");
+  });
+  $("chatCloseBtn").addEventListener("click", () => {
+    $("chatDrawer").classList.remove("open");
   });
   $("chatForm").addEventListener("submit", (e) => {
     e.preventDefault();
