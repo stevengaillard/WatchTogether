@@ -254,9 +254,10 @@
     return s;
   }
 
-  function startPeer(attempt) {
-    attempt = attempt || 0;
-    const code = randomCode();
+  const FIXED_ROOM = "OUR-PRIVATE-ROOM";
+
+  function startPeer(isGuest) {
+    const code = isGuest ? randomCode(8) : FIXED_ROOM;
     const p = new Peer(code, {
       config: {
         iceServers: [
@@ -268,35 +269,38 @@
     p.on("open", (id) => {
       state.peer = p;
       state.myId = id;
-      $("myCode").textContent = id;
-      $("roomCodeLabel").textContent = id;
-      $("joinBtn").disabled = false;
-      $("enterAloneBtn").disabled = false;
-      checkPendingJoinFromLink();
+      $("roomCodeLabel").textContent = isGuest ? "Guest" : "Host";
+      
+      // Skip the lobby screen entirely
+      enterRoom();
+      
+      // Automatically connect to the other person
+      if (isGuest) {
+        connectToPeer(FIXED_ROOM);
+      }
     });
     p.on("connection", (conn) => {
-      enterRoom();
       setupDataConnection(conn);
     });
     p.on("call", (call) => {
-      enterRoom();
       call.answer(state.localStream || undefined);
       setupCall(call, call.peer);
     });
     p.on("error", (err) => {
       const msg = (err && err.type) || String(err);
-      if (msg.includes("unavailable-id") && attempt < 6) {
+      // If the ID is taken, it means your partner is already waiting. Restart as guest!
+      if (msg.includes("unavailable-id")) {
         p.destroy();
-        startPeer(attempt + 1);
+        startPeer(true);
         return;
       }
       console.error("Peer error:", err);
       if (msg.includes("peer-unavailable")) {
-        setBanner("error", "Couldn't reach that code. Ask your friend for their current code — it resets every time they reload the page.");
+        setBanner("waiting", "Waiting for your partner to join...");
       }
     });
   }
-  startPeer();
+  startPeer(false);
 
   function inviteLink() {
     const url = new URL(location.href);
@@ -466,9 +470,9 @@
     const n = state.connections.size;
     $("peerCount").textContent = String(n);
     if (n > 0) {
-      setBanner("connected", "Connected with " + n + (n === 1 ? " person" : " people") + ".");
+      setBanner("connected", "Connected with your partner.");
     } else if (state.inRoom) {
-      setBanner("waiting", "Not connected yet — share your code above, or enter theirs.");
+      setBanner("waiting", "Waiting for your partner to open the page...");
     }
   }
 
