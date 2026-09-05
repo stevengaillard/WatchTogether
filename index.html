@@ -521,13 +521,14 @@
   }
 
   // ---------- Camera / mic toggles (room toolbar) ----------
-  $("camToggleBtn").addEventListener("click", async () => {
+  $("micToggleBtn").addEventListener("click", async () => {
+    const hadStream = !!state.localStream;
     if (!state.localStream) { await ensureMedia(); }
     if (!state.localStream) return;
-    state.camOn = !state.camOn;
-    state.localStream.getVideoTracks().forEach((t) => (t.enabled = state.camOn));
-    $("camToggleBtn").textContent = state.camOn ? "Camera on" : "Camera off";
-    $("camToggleBtn").classList.toggle("active", state.camOn);
+    if (hadStream) state.micOn = !state.micOn;
+    state.localStream.getAudioTracks().forEach((t) => (t.enabled = state.micOn));
+    $("micToggleBtn").textContent = state.micOn ? "Mic on" : "Mic off";
+    $("micToggleBtn").classList.toggle("active", state.micOn);
   });
 
   $("micToggleBtn").addEventListener("click", async () => {
