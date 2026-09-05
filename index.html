@@ -883,6 +883,7 @@
   }
 
   function applyRemoteSync(data) {
+    if (data.action === "pause") showToast("Your partner paused the video.", 3000);
     if (state.ytPlayer) {
       state.suppressSync = true;
       state.ytPlayer.seekTo(data.time, true);
